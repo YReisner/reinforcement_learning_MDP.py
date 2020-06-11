@@ -88,17 +88,14 @@ def create_rewards(world,regular):
      # Create reward vector
      R = np.zeros((world.nStates,1)) + regular
      for i in world.stateHoles:
-          R[i-1] = 0
-     R[world.stateGoal[0]-1] = 0
+          R[i-1] = -1
+     R[world.stateGoal[0]-1] = 1
      return R
 
 
 def value_iteration(world,states,rewards,transition,discount,threshold):
      # Return optimal value and policy
      V = np.zeros((world.nStates,1)) # initiate all values to zero
-     for i in world.stateHoles: # Values determine by world model
-          V[i-1] = -1
-     V[12] = 1
      unstable_values = True
      while unstable_values:
           delta = 0
@@ -106,7 +103,7 @@ def value_iteration(world,states,rewards,transition,discount,threshold):
                v = np.copy(V[s])
                possibilities = np.zeros((world.nActions,1))
                for i in range(world.nActions):
-                    possibilities[i] = rewards[s] + discount*np.dot(transition[i][s],V)
+                    possibilities[i] = np.dot(transition[i][s],rewards) + discount*np.dot(transition[i][s],V)
                if s not in [0,6,12,13,14]:
                     V[s] = np.amax(possibilities)
                delta = np.maximum(delta,abs(v-V[s]))
@@ -115,10 +112,10 @@ def value_iteration(world,states,rewards,transition,discount,threshold):
      policy = np.zeros((world.nStates,1))
      options = np.zeros((world.nStates,4))
      for i in range(world.nActions):
-          options[:,[i]] = rewards + discount * np.dot(transition[i],V)
+          options[:,[i]] = np.dot(transition[i],rewards) + discount * np.dot(transition[i],V)
      policy = np.argmax(options,axis=1)
      policy = policy + 1
-     print("found optimal values and policy for discount %f and threshold %f" %(discount,threshold))
+     print("Value Iteration found optimal values and policy for discount %f and threshold %f" %(discount,threshold))
      return V,policy
 
 
@@ -135,29 +132,31 @@ def policy_iteration(world,states,rewards,transition,discount,threshold):
                unstable_policy = False
           Pi = Pi_next.copy()
      Pi = np.argmax(Pi, axis=1) + 1
+     print("Policy Iteration found optimal values and policy for discount %f and threshold %f" % (discount, threshold))
      return Pi, values
 
 
 def policy_evaluation(world,transition, rewards,states, Pi,discount,threshold):
+     # Evaluate values for given policy Pi
      V = np.zeros((world.nStates, 1))
-     for i in world.stateHoles:
-          V[i - 1] = -1
-     V[12] = 1
      unstable_values = True
      while unstable_values:
           delta = 0
           for s in states:
              v = V[s].copy()
              temp_value_sum = 0
+             temp_reward_sum = 0
              if s not in [0, 6, 12, 13, 14]:
                   for i in range(world.nActions):
                        temp_value_sum += Pi[s,i] * np.dot(transition[i][s], V)
-                  V[s] = rewards[s] + discount * temp_value_sum
+                       temp_reward_sum += Pi[s,i] * np.dot(transition[i][s],rewards)
+                  V[s] = temp_reward_sum + discount * temp_value_sum
              delta = np.maximum(delta, abs(v - V[s]))
           if delta < threshold:
                return V
 
 def policy_improvement(world,transition,rewards,states,values,discount):
+     # Improve policy for give values
      q = np.zeros((world.nStates, world.nActions))
      Pi_next = np.zeros((world.nStates, world.nActions))
      for s in states:
@@ -166,7 +165,7 @@ def policy_improvement(world,transition,rewards,states,values,discount):
                     temp = np.dot(transition[a][s], values)
                else:
                     temp = 0
-               q[s, a] = rewards[s] + discount * temp
+               q[s, a] = np.dot(transition[a][s],rewards) + discount * temp
      for s in states:
           if s not in [0, 6, 12, 13, 14]:
                max_val = np.max(q[s, :])
@@ -178,18 +177,23 @@ def policy_improvement(world,transition,rewards,states,values,discount):
 if __name__ == "__main__":
 
      world = World()
+     #Part A
      P = create_transition_matrix()
      states = get_states(world)
      rewards = create_rewards(world,-0.04)
+     #Part B
      value, policy = value_iteration(world, states, rewards, P, 1, 10**-4)
      world.plot_value(value)
      world.plot_policy(policy)
+     #Part C
      value, policy = value_iteration(world, states, rewards, P, 0.9, 10**-4)
      world.plot_value(value)
      world.plot_policy(policy)
+     #Part D
      rewards = create_rewards(world, -0.02)
      value, policy = value_iteration(world, states, rewards, P, 1, 10 ** -4)
      world.plot_value(value)
      world.plot_policy(policy)
+     #Part E
      rewards = create_rewards(world, -0.04)
      value, policy = policy_iteration(world, states, rewards, P, 0.9, 10 ** -4)
